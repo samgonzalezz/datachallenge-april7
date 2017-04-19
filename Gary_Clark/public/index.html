@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <style>
+    #map {
+      height: 100%;
+    }
+
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.4/lodash.min.js"></script>
+  <script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+  <script>
+    var map;
+    var json = "uniJSON.json";
+    function initMap() {
+      var mapProp = {
+        center: new google.maps.LatLng(31.783, -99.138),
+        zoom: 7,
+        mapTypeId: google.maps.MapTypeId.ROADMAP
+      };
+
+      map = new google.maps.Map(document.getElementById("map"), mapProp);
+
+      $.get(`/data`, function (json1) {
+        _.forEach(json1, data => {
+          var coords = new google.maps.LatLng(data[`location.lat`], data[`location.lon`]);
+
+          var marker = new google.maps.Marker({
+            position: coords,
+            map: map,
+            title: data[`school.name`]
+          });
+        })
+      });
+
+      $.get(`/yelp`, function (ratings) {
+        let heater = [];
+        $.each(ratings, function (key, data) {
+
+          var latlng = new google.maps.LatLng(data.lat, data.lng);
+          heater.push(latlng);
+        })
+        var heatmap = new google.maps.visualization.HeatmapLayer({
+          data: heater,
+          dissipating: false,
+          map: map
+        });
+      })
+
+    };
+  </script>
+  <!--Need to get API Key from Google Maps for below request-->
+  <script async defer src=`https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=visualization&callback=initMap`>
+  </script>
+
+</body>
+
+</html>

@@ -1,0 +1,37 @@
+[
+  {
+    "school.city": "College Station",
+    "location.lon": -96.340322,
+    "location.lat": 30.613226,
+    "school.name": "Texas A & M University-College Station",
+    "2014.student.size": 46941
+  },
+  {
+    "school.city": "Austin",
+    "location.lon": -97.73924,
+    "location.lat": 30.286598,
+    "school.name": "The University of Texas at Austin",
+    "2014.student.size": 38914
+  },
+  {
+    "school.city": "San Marcos",
+    "location.lon": -97.936392,
+    "location.lat": 29.889202,
+    "school.name": "Texas State University",
+    "2014.student.size": 32177
+  },
+  {
+    "school.city": "Houston",
+    "location.lon": -95.344851,
+    "location.lat": 29.719988,
+    "school.name": "University of Houston",
+    "2014.student.size": 31643
+  },
+  {
+    "school.city": "Denton",
+    "location.lon": -97.151211,
+    "location.lat": 33.210958,
+    "school.name": "University of North Texas",
+    "2014.student.size": 29758
+  }
+]
