@@ -1,0 +1,353 @@
+---
+title: "Data Challenge Winner"
+author: "Samuel Gonzalez"
+date: "April 5, 2017"
+output: html_document
+---
+
+```{r setup, message = FALSE, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library (ggplot2)
+library (stats)
+library (dplyr)
+library (reshape2)
+library (ggplot2)
+library (readr)
+library (lubridate)
+library (plotly)
+library (RRhelpr)
+library (cluster)
+library (fpc)
+library (scales)
+library (knitr)
+library (gtable)
+library (data.table)
+library(DT)
+library(magrittr)
+
+
+```
+
+
+# Motivation
+
+* The World Happiness Report for 2017 was recently released on World Happiness Day (Mar 20)
+* The US dropped to #14 since 2016
+* So, just what kind of countries make up our dataset? Are they happy or unhappy?
+
+# Data
+
+* Kaggle.com provides a dataset for 2016 World Happiness data from the World Happiness Report
+* The data consists measures of the level of happiness of inhabitants of 157 countries
+* There are seven numeric variables:
+    + Economy
+    + Family
+    + Health
+    + Freedom
+    + Trust of Government
+    + Generosity
+    + Dystopia Residual
+        + A measure of how much a country differs from a dystopian society
+* Larger values of these predictors are indicative of happier people
+* The country name, and a Region were manually added to the data
+
+# Exploration
+
+Three different multivariate methods were used to analyze this data as a whole:
+
+* PCA
+* Kmeans Clustering
+* Hierarchical Clustering
+
+Results for each method are reported
+
+**Let's see what the data is telling us about these 157 countries!**
+
+
+
+
+```{r Data, echo= FALSE,results='hide', message = FALSE}
+
+happiness_raw <- read_csv('E:\\Data Challenge\\happiness.csv')
+happiness_std <- scale(happiness_raw[5:11], center = TRUE, scale = TRUE)
+happiness2 = cbind(happiness_raw[1:4], happiness_std)
+happiness = happiness2
+
+myheaders = colnames(happiness)
+
+#Shorten Variable Names
+myheaders[1] = "Country"
+myheaders[5] = "Econ"
+myheaders[7] = "Health"
+myheaders [9] = "Govt_Trust"
+myheaders [10] = "Giving"
+myheaders [11] = "Dystopia_Res"
+colnames(happiness) <- myheaders
+# test = colnames(happiness)
+
+```
+
+The list of countries and their regions are shown below:
+```{r}
+datatable(happiness[c(1,2)])
+```
+
+# PCA
+```{r PCA, echo = FALSE}
+
+##PCA ANALYSIS
+## Need to standardize the variables first
+happiness_pca <- stats::prcomp(happiness[5:11], center = TRUE, scale. = TRUE)
+happiness_proportion_pca = happiness_pca$sdev^2/sum(happiness_pca$sdev^2)
+happiness$PC1 = happiness_pca$x[,1]
+happiness$PC2 = happiness_pca$x[,2]
+happiness$PC3 = happiness_pca$x[,3]
+
+
+```
+
+
+The following is a scree plot showing the variance explained by each of the principal components.
+
+
+```{r Scree, echo = FALSE}
+happiness_numvars = ncol(happiness[5:11])
+plot(happiness_proportion_pca[1:happiness_numvars])
+PC1_PC3_proportion = sum(happiness_proportion_pca[1:3])
+```
+
+
+
+This is the story told by each Principal Component
+
+
+
+```{r Eigenvectors}
+#Plot EigenVectors
+happiness_eigenvectors = as.data.frame(happiness_pca$rotation)
+kable(happiness_eigenvectors, caption = "Happiness Data Eigenvectors")
+
+print(paste("The Total Proportion Explained by PC1 to PC3 is ", as.character(PC1_PC3_proportion), sep = ""))
+
+```
+
+
+
+The biplot below shows the separations and associations between the variables.
+Color-coding by "Regions" help identify the regions that are closely associated with certain variables.
+
+
+
+```{r Biplot}
+#Plot BiPlot
+ggbiplot(happiness_pca, obs.scale = 1, var.scale = 1, ellipse = FALSE, circle = TRUE, groups = happiness$Region) +
+  scale_color_RR(theme="RR_Health") + theme_RR() 
+```
+
+
+
+The values of PC1 and PC2 for each observation can be plotted against each other and color coded by region to visualize the distinctions that the PCA is making within the pool of countries
+
+
+
+```{r PCA_by_region}
+# PCA by region
+happiness_plotme1 <- ggplot(data = as.data.frame(happiness_pca$x[,1:2]), aes(x = PC1, y = PC2)) + 
+  geom_point(size = 2) + geom_point(aes(colour = happiness$Region)) +
+  labs(x = paste("PC1 (",scales::percent(happiness_proportion_pca[1]), " explained var.)", sep = ""),
+       y = paste("PC2 (", scales::percent(happiness_proportion_pca[2]), " explained var.)", sep = ""))
+
+ggplotly(happiness_plotme1)
+```
+
+
+
+Countries with PC1 Extremes
+
+
+
+```{r PC1_Extremes}
+
+happiness_ranked = happiness
+happiness_ranked %<>% setorder(PC1)
+datatable(happiness_ranked[c(1:5, 151:155),c(1,12)])
+
+# colnames(happiness_ranked)
+
+```
+
+```{r PC2_Extremes}
+
+happiness_ranked = happiness
+happiness_ranked %<>% setorder(PC2)
+datatable(happiness_ranked[c(1:5, 151:155),c(1,13)])
+
+
+```
+
+
+# Kmeans Clustering
+
+Clustering Analysis Conducted.
+
+The cluster means tell a different story for each cluster
+
+```{r Kmeansclustering}
+##K MEANS CLUSTERING
+nclusters = 3
+happiness_kclus <- kmeans(happiness[5:11],nclusters,nstart = 20)
+happiness$Kclus = happiness_kclus$cluster
+happiness_kclus$KCluster = as.factor(happiness_kclus$cluster)
+
+happiness_K_ClusterSummary <- as.data.frame(happiness_kclus$centers)
+
+#Overlay Cluster means
+
+# happiness_K_ClusterSummary$ClusterID <- as.factor(rownames(happiness_K_ClusterSummary))
+
+# adding the word cluster to the cluster IDs
+happiness_K_ClusterSummary$ClusterID <- paste("Cluster",rownames(happiness_K_ClusterSummary) , sep="_")
+
+happiness_K_ClusterSummary <- happiness_K_ClusterSummary[c(8,1:7)]
+
+happiness_ClusterSummaryPlot <- melt(happiness_K_ClusterSummary,id = "ClusterID")
+
+ggplotly(ggplot(data = happiness_ClusterSummaryPlot, aes(x = variable, y = value, group = ClusterID, colour = ClusterID)) + geom_line())
+
+# plot(happiness$Econ)
+# plot(happiness2$Econ)
+
+
+```
+
+Stories told by Clusters
+
+```{r Cluster_Means, message = FALSE}
+kable(happiness_K_ClusterSummary, caption = "Happiness Data Kmean Cluster Means")
+```
+
+```{r Kmeans_charac, message = FALSE}
+
+kmeans_charac_summary <- read_csv('E:\\Data Challenge\\Kmeans_Cluster_chars.csv', col_names = TRUE)
+kable(kmeans_charac_summary, caption = "Happiness Kmeans Cluster Characteristics")
+
+
+```
+
+Cluster Visualization 2 dimensional
+
+```{r Kclusters_on_PCA, message = FALSE}
+happiness_plotme2 <- ggplot(data = as.data.frame(happiness_pca$x[,1:2]), aes(x = PC1, y = PC2)) +
+  geom_point(size = 2) + geom_point(aes(colour = as.factor(happiness$Kclus))) +
+  labs(x = paste("PC1 (",scales::percent(happiness_proportion_pca[1]), " explained var.)",sep = ""),
+       y = paste("PC2 (", scales::percent(happiness_proportion_pca[2]), " explained var.)", sep = ""))
+
+ggplotly(happiness_plotme2)
+# happiness_plotme2
+
+```
+
+Cluster Visualization 3 dimensional, overlaid on Principal Components
+
+```{r Kmeans3D, message = FALSE}
+plot_ly(happiness, x = ~PC1, y = ~PC2, z = ~PC3, color = as.factor(happiness$Kclus), colors = c('red', 'blue', 'green'))
+```
+
+```{r}
+happiness_cluster2 = happiness[which(happiness$Kclus ==2),c(1,15)]
+datatable(happiness_cluster2)
+
+```
+
+
+```{r}
+happiness_cluster3 = happiness[which(happiness$Kclus ==3),c(1,15)]
+datatable(happiness_cluster3)
+
+```
+
+
+
+# Hierarchical Clustering
+
+
+A dendogram showing membership in a cluster is shown below
+
+```{r Hierarchical_Clustering, message = FALSE}
+# method = "complete"
+method = "ward.D"
+happiness_clusters_hier <- hclust(dist((happiness[,5:11]), method = "euclidean"), method = method)
+plot(happiness_clusters_hier, cex = 0.6)
+
+# Cut tree into 3 groups
+grp <- cutree(happiness_clusters_hier, k = 3)
+happiness$HierCluster = grp
+
+# # Visualize
+# plot(res.hc, cex = 0.6) # plot tree
+rect.hclust(happiness_clusters_hier, k = 3, border = 2:5) # add rectangles with colors
+```
+
+Similarly to Kmean, clusters give out different stories
+
+```{r, Hierarchical_stories, message = FALSE}
+hierCluster1data = happiness[which(happiness$HierCluster == 1),5:11]
+hierCluster2data = happiness[which(happiness$HierCluster == 2),5:11]
+hierCluster3data = happiness[which(happiness$HierCluster == 3),5:11]
+
+# Column Means
+Cluster_1 = colMeans(hierCluster1data)
+Cluster_2 = colMeans(hierCluster2data)
+Cluster_3 = colMeans(hierCluster3data)
+
+happiness_hier_ClusterSummary = as.data.frame(rbind(Cluster_1,Cluster_2,Cluster_3))
+
+happiness_hier_ClusterSummary$ClusterID <- as.factor(rownames(happiness_hier_ClusterSummary))
+
+happiness_hier_ClusterSummaryPlot <- melt(happiness_hier_ClusterSummary,id = "ClusterID")
+
+happiness_hier_ClusterSummary <- happiness_hier_ClusterSummary[c(8,1:7)]
+
+ggplotly(ggplot(data = happiness_hier_ClusterSummaryPlot, aes(x = variable, y = value, group = ClusterID, colour = ClusterID)) + geom_line())
+
+```
+
+```{r}
+
+kable(happiness_hier_ClusterSummary, caption = "Happiness Hierarchical Cluster Means")
+
+```
+
+```{r, Kmeans_cluster_chars, message = FALSE}
+
+hier_charac_summary <- read_csv('E:\\Data Challenge\\Hierarchical_Cluster_chars.csv', col_names = TRUE)
+kable(hier_charac_summary, caption = "Happiness Hierarchical Cluster Characteristics")
+
+```
+
+```{r}
+happiness_hiercluster3 = happiness[which(happiness$HierCluster ==3),c(1,16)]
+datatable(happiness_hiercluster3)
+
+```
+
+```{r}
+happiness_hiercluster1 = happiness[which(happiness$HierCluster ==1),c(1,16)]
+datatable(happiness_hiercluster1)
+
+```
+
+```{r map_visualization, message = FALSE}
+
+map_world = map_data("world")
+
+happiness$Country[c(18,75,77,78,122)] <- c("UK", "USA", "Republic of Congo", "Democratic Republic of the Congo", "Palestine")
+
+happiness$HierCluster %<>% as.factor %>% plyr::mapvalues(c(1,2,3), c("Mid", "Bottom", "Top"))
+
+map_world_joined <- left_join(map_world,happiness, by = c('region' = 'Country'))
+
+ggplot() + geom_polygon(data = map_world_joined, aes(x = long, y = lat, group = group, fill=HierCluster), color = "#000000") 
+
+```
